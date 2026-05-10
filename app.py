@@ -1,3 +1,4 @@
+import hashlib, time
 import os, random, string
 from flask import Flask, request, jsonify, render_template_string
 from datetime import datetime
@@ -187,3 +188,4 @@ if __name__ == '__main__':
 
 
 
+print(f'--- [GHOST ID ACTIVO]: Chrono-Daniel-' + hashlib.sha256(str(int(time.time() / 60)).encode()).hexdigest()[:8])
