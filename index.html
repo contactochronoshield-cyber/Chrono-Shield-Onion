@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHRONO SHIELD | TERMINAL AAP</title>
+    <style>
+        :root {
+            --neon-blue: #00ffee;
+            --bg-dark: #050505;
+            --panel-bg: rgba(10, 10, 10, 0.9);
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: white;
+            font-family: 'Courier New', Courier, monospace; /* Fuente técnica */
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Monitor de Señal (Osciloscopio) */
+        #canvas-container {
+            width: 100%;
+            height: 120px;
+            background: #000;
+            border-bottom: 1px solid rgba(0, 255, 238, 0.3);
+            position: relative;
+        }
+
+        canvas { width: 100%; height: 100%; }
+
+        .header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-tag {
+            font-size: 12px;
+            color: var(--neon-blue);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .main-terminal {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        #log-area {
+            flex: 1;
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 255, 238, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #00ccbc;
+        }
+
+        .entry { margin-bottom: 10px; border-left: 2px solid var(--neon-blue); padding-left: 10px; }
+        .timestamp { color: #666; font-size: 11px; margin-right: 8px; }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            padding-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            background: #111;
+            border: 1px solid #333;
+            padding: 15px;
+            color: var(--neon-blue);
+            outline: none;
+            border-radius: 4px;
+        }
+
+        input:focus { border-color: var(--neon-blue); }
+
+        button {
+            padding: 0 25px;
+            background: var(--neon-blue);
+            color: black;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        button:active { filter: brightness(0.8); }
+
+        .tech-info {
+            font-size: 10px;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="osc"></canvas>
+        <div style="position:absolute; top:5px; left:10px; font-size:10px; color:var(--neon-blue)">AAP SIGNAL MONITOR</div>
+    </div>
+
+    <div class="header">
+        <div style="font-weight: bold; letter-spacing: 1px;">CHRONO SHIELD <span style="color:#444;">v2.6.0</span></div>
+        <div class="status-tag">● MESH NODE ACTIVE</div>
+    </div>
+
+    <div class="main-terminal">
+        <div id="log-area">
+            <div class="entry">
+                <span class="timestamp">[16:45:12]</span> 
+                SISTEMA INICIALIZADO. Protocolo Acústico Alternativo (AAP) en espera...
+            </div>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="target-msg" placeholder="Escriba mensaje para modular..." autocomplete="off">
+            <button onclick="transmit()">TRANSMITIR</button>
+        </div>
+
+        <div class="tech-info">
+            <span>MOD: CHRONO-ACOUSTIC</span>
+            <span>FREQ: 18.5kHz - 20kHz</span>
+            <span>LATENCY: 120ms</span>
+        </div>
+    </div>
+
+    <script>
+        const logArea = document.getElementById('log-area');
+
+        function transmit() {
+            const input = document.getElementById('target-msg');
+            if(!input.value) return;
+
+            const time = new Date().toLocaleTimeString();
+            
+            // Añadir al log local
+            const div = document.createElement('div');
+            div.className = 'entry';
+            div.innerHTML = `<span class="timestamp">[${time}]</span> <span style="color:white">OUT:</span> ${input.value}`;
+            logArea.appendChild(div);
+            logArea.scrollTop = logArea.scrollHeight;
+
+            // Aquí iría la lógica real de Web Audio API para convertir texto a frecuencias
+            console.log("Modulando señal AAP...");
+            
+            input.value = "";
+        }
+
+        // Simulación básica de osciloscopio
+        const canvas = document.getElementById('osc');
+        const ctx = canvas.getContext('2d');
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#00ffee';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height/2);
+            for(let i=0; i<canvas.width; i++) {
+                ctx.lineTo(i, (canvas.height/2) + Math.sin(i * 0.05 + Date.now() * 0.01) * 10);
+            }
+            ctx.stroke();
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>
+
+
+
+
+

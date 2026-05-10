@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHRONO SHIELD | AAP PROTOCOL</title>
+    <style>
+        :root { --neon: #00ffee; --bg: #050505; }
+        body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        #monitor { width: 100%; height: 150px; border-bottom: 1px solid #222; background: #000; }
+        .terminal { flex: 1; padding: 20px; display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; width: 100%; }
+        #log { flex: 1; background: rgba(0,0,0,0.8); border: 1px solid #111; padding: 15px; overflow-y: auto; color: var(--neon); font-size: 13px; border-radius: 5px; }
+        .entry { margin-bottom: 8px; border-left: 2px solid #222; padding-left: 10px; }
+        .entry.rx { border-left-color: #ff0055; color: #ff0055; } /* Color para datos recibidos por aire */
+        .controls { display: flex; gap: 10px; padding: 20px 0; }
+        input { flex: 1; background: #111; border: 1px solid #333; padding: 12px; color: var(--neon); border-radius: 4px; outline: none; }
+        button { background: var(--neon); color: black; border: none; padding: 0 20px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        .stats { font-size: 10px; color: #444; display: flex; justify-content: space-between; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<canvas id="monitor"></canvas>
+
+<div class="terminal">
+    <div id="log">
+        <div class="entry">[SYSTEM] AAP STACK READY. Esperando interacción...</div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="msg" placeholder="Mensaje para modular..." autocomplete="off">
+        <button onclick="transmit()">TRANSMITIR</button>
+    </div>
+
+    <div class="stats">
+        <span>MODE: ULTRASONIC FSK</span>
+        <span>FREQ: 18.5kHz / 19.5kHz</span>
+        <span id="status">MIC: OFF</span>
+    </div>
+</div>
+
+<script>
+const logDiv = document.getElementById('log');
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let analyzer, dataArray, source;
+
+// --- REGISTRO DE EVENTOS ---
+function addLog(text, type = '') {
+    const div = document.createElement('div');
+    div.className = `entry ${type}`;
+    div.innerHTML = `<span style="color:#666">[${new Date().toLocaleTimeString()}]</span> ${text}`;
+    logDiv.appendChild(div);
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+// --- TRANSMISIÓN ACÚSTICA (TX) ---
+function playAudioSignal(text) {
+    const duration = 0.15; 
+    const fLow = 18500;  // Bit 0
+    const fHigh = 19500; // Bit 1
+    let time = audioCtx.currentTime + 0.1;
+
+    // Convertir a binario
+    const bin = text.split('').map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join('');
+
+    bin.split('').forEach(bit => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.frequency.value = (bit === '1') ? fHigh : fLow;
+        g.gain.setValueAtTime(0.1, time);
+        g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+        osc.connect(g).connect(audioCtx.destination);
+        osc.start(time);
+        osc.stop(time + duration);
+        time += duration;
+    });
+}
+
+// --- RECEPCIÓN Y ANÁLISIS (RX) ---
+async function initRX() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        source = audioCtx.createMediaStreamSource(stream);
+        analyzer = audioCtx.createAnalyser();
+        analyzer.fftSize = 2048;
+        source.connect(analyzer);
+        dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        document.getElementById('status').innerText = "MIC: ON (LISTENING)";
+        draw();
+    } catch(e) { addLog("ERROR: Acceso al micro denegado.", "rx"); }
+}
+
+// --- VISUALIZADOR (OSCILOSCOPIO TÉCNICO) ---
+const canvas = document.getElementById('monitor');
+const ctx = canvas.getContext('2d');
+
+function draw() {
+    requestAnimationFrame(draw);
+    analyzer.getByteFrequencyData(dataArray);
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#00ffee';
+    ctx.beginPath();
+    let sliceWidth = canvas.width / dataArray.length;
+    let x = 0;
+    for(let i = 0; i < dataArray.length; i++) {
+        let v = dataArray[i] / 128.0;
+        let y = v * canvas.height / 2;
+        if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        x += sliceWidth;
+    }
+    ctx.stroke();
+}
+
+// --- ACCIÓN PRINCIPAL ---
+async function transmit() {
+    const input = document.getElementById('msg');
+    const val = input.value;
+    if(!val) return;
+
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+    if(!analyzer) await initRX();
+
+    addLog(`TX >> MODULANDO: ${val}`);
+    playAudioSignal(val);
+
+    // Enviar al servidor local/túnel
+    fetch('/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ text: val })
+    });
+    input.value = "";
+}
+
+// Activar audio al primer toque
+document.body.addEventListener('click', () => {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+}, {once: true});
+</script>
+</body>
+</html>
