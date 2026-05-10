@@ -1,379 +1,85 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>CHRONO SHIELD</title>
-
-<style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial;
-}
-
-body{
-background:#000;
-color:white;
-overflow:hidden;
-height:100vh;
-}
-
-/* FONDO */
-
-body::before{
-content:"";
-position:fixed;
-width:100%;
-height:100%;
-background:
-radial-gradient(circle at center,
-rgba(0,255,255,0.15),
-rgba(0,0,0,1));
-z-index:-2;
-}
-
-/* PARTICULAS */
-
-canvas{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-z-index:-1;
-}
-
-/* CONTENEDOR */
-
-.main{
-height:100vh;
-display:flex;
-flex-direction:column;
-padding:20px;
-}
-
-/* HEADER */
-
-.header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:20px;
-}
-
-.logo{
-font-size:22px;
-font-weight:bold;
-color:#00ffee;
-text-shadow:0 0 15px #00ffee;
-}
-
-.status{
-font-size:12px;
-padding:8px 14px;
-border-radius:20px;
-border:1px solid #00ffee;
-color:#00ffee;
-}
-
-/* TITULO */
-
-.hero{
-text-align:center;
-margin-top:20px;
-}
-
-.hero h1{
-font-size:38px;
-line-height:1.1;
-color:#00ffee;
-text-shadow:
-0 0 20px #00ffee;
-}
-
-.hero p{
-margin-top:15px;
-color:#aaa;
-font-size:15px;
-line-height:1.6;
-}
-
-/* CHAT */
-
-.chat{
-margin-top:25px;
-background:rgba(0,0,0,0.55);
-border:1px solid rgba(0,255,238,0.2);
-border-radius:25px;
-padding:15px;
-backdrop-filter:blur(10px);
-display:flex;
-flex-direction:column;
-flex:1;
-}
-
-.messages{
-flex:1;
-overflow:auto;
-margin-bottom:15px;
-}
-
-.msg{
-background:rgba(0,255,238,0.08);
-padding:12px;
-border-radius:14px;
-margin-bottom:10px;
-font-size:14px;
-border:1px solid rgba(0,255,238,0.08);
-}
-
-.time{
-font-size:11px;
-color:#00ffee;
-margin-bottom:4px;
-}
-
-input{
-width:100%;
-padding:15px;
-border:none;
-outline:none;
-background:#050505;
-border-radius:15px;
-color:white;
-margin-bottom:12px;
-border:1px solid rgba(0,255,238,0.15);
-}
-
-.buttons{
-display:flex;
-gap:10px;
-}
-
-button{
-flex:1;
-padding:14px;
-border:none;
-border-radius:14px;
-background:#00ffee;
-color:black;
-font-weight:bold;
-}
-
-.footer{
-text-align:center;
-font-size:12px;
-color:#555;
-margin-top:10px;
-}
-
-/* SCROLL */
-
-::-webkit-scrollbar{
-width:4px;
-}
-
-::-webkit-scrollbar-thumb{
-background:#00ffee;
-}
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrono Shield v2.6.1 - Tactical Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { background-color: #050a0f; color: #00ffff; font-family: 'Courier New', monospace; margin: 0; padding: 20px; }
+        .header { border: 2px solid #00ffff; padding: 20px; text-align: center; box-shadow: 0 0 15px #00ffff; margin-bottom: 30px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { border: 1px solid #ff00ff; padding: 15px; background: rgba(255, 0, 255, 0.05); text-align: center; }
+        .btn { background: none; border: 1px solid #00ffff; color: #00ffff; padding: 10px 20px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+        .btn:hover { background: #00ffff; color: #000; }
+        .btn-danger { border-color: #ff0000; color: #ff0000; }
+        .btn-danger:hover { background: #ff0000; color: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #333; padding: 10px; text-align: left; font-size: 0.8em; }
+        th { color: #ff00ff; }
+        .status-badge { padding: 5px; border-radius: 3px; font-weight: bold; }
+        .normal { color: #00ff00; }
+        .lockdown { color: #ff0000; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
 </head>
-
 <body>
-
-<canvas id="bg"></canvas>
-
-<div class="main">
-
-<div class="header">
-
-<div class="logo">
-⚡ CHRONO SHIELD
-</div>
-
-<div class="status">
-ONLINE
-</div>
-
-</div>
-
-<div class="hero">
-
-<h1>
-POST INTERNET<br>
-NETWORK
-</h1>
-
-<p>
-Experimental cyberpunk communication system powered by mobile infrastructure and AAP technology.
-</p>
-
-</div>
-
-<div class="chat">
-
-<div class="messages" id="messages">
-
-<div class="msg">
-<div class="time">SYSTEM</div>
-Chrono Shield initialized.
-</div>
-
-</div>
-
-<input id="msg" placeholder="Transmit signal...">
-
-<div class="buttons">
-
-<button onclick="send()">
-SEND
-</button>
-
-<button onclick="fake()">
-SCAN
-</button>
-
-</div>
-
-</div>
-
-<div class="footer">
-Chrono Shield Networks © 2026
-</div>
-
-</div>
-
-<script>
-
-async function load(){
-
-let r=await fetch("/messages");
-let data=await r.json();
-
-let div=document.getElementById("messages");
-
-div.innerHTML="";
-
-data.reverse();
-
-data.forEach(m=>{
-
-div.innerHTML+=`
-<div class="msg">
-<div class="time">${m.time}</div>
-${m.text}
-</div>
-`;
-
-});
-
-}
-
-async function send(){
-
-let input=document.getElementById("msg");
-
-if(input.value=="") return;
-
-await fetch("/send",{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-text:input.value
-})
-});
-
-input.value="";
-
-load();
-
-}
-
-function fake(){
-
-let msgs=[
-
-"Scanning encrypted nodes...",
-"AAP signal detected...",
-"Secure mesh connected...",
-"Node synchronized...",
-"Quantum route enabled..."
-
-];
-
-let div=document.getElementById("messages");
-
-div.innerHTML=
-`
-<div class="msg">
-<div class="time">SYSTEM</div>
-${msgs[Math.floor(Math.random()*msgs.length)]}
-</div>
-`
-+ div.innerHTML;
-
-}
-
-setInterval(load,2000);
-
-load();
-
-/* PARTICLES */
-
-const canvas=document.getElementById("bg");
-const ctx=canvas.getContext("2d");
-
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
-
-let particles=[];
-
-for(let i=0;i<70;i++){
-
-particles.push({
-
-x:Math.random()*canvas.width,
-y:Math.random()*canvas.height,
-r:Math.random()*2
-
-});
-
-}
-
-function draw(){
-
-ctx.clearRect(0,0,canvas.width,canvas.height);
-
-ctx.fillStyle="#00ffee";
-
-particles.forEach(p=>{
-
-ctx.beginPath();
-ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-ctx.fill();
-
-p.y+=0.3;
-
-if(p.y>canvas.height){
-p.y=0;
-}
-
-});
-
-requestAnimationFrame(draw);
-
-}
-
-draw();
-
-</script>
-
+    <div class="header">
+        <h1>🛡️ CHRONO SHIELD NETWORKS</h1>
+        <p>Nodo Operativo: BOGOTÁ | CEO: Daniel Gonzales Martínez</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>DISPOSITIVOS</h3>
+            <p style="font-size: 2em;">{{ stats.usuarios }}</p>
+        </div>
+        <div class="card">
+            <h3>ESTADO</h3>
+            <p class="status-badge {{ 'lockdown' if stats.status == 'LOCKDOWN' else 'normal' }}">
+                {{ stats.status }}
+            </p>
+        </div>
+        <div class="card">
+            <h3>ACCIONES</h3>
+            <button class="btn" onclick="ejecutar()">AUDITORÍA DE RED</button>
+            <button class="btn btn-danger" onclick="bloquear()">BLINDAJE TOTAL</button>
+        </div>
+    </div>
+
+    <h3>LOGS DE ACTIVIDAD RECIENTE</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>FECHA</th>
+                <th>IDENTIDAD</th>
+                <th>EVENTO</th>
+                <th>ORIGEN</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log[0] }}</td>
+                <td>{{ log[1] }}</td>
+                <td>{{ log[2] }}</td>
+                <td>{{ log[3] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        function ejecutar() {
+            $.post('/ejecutar', function(data) { alert(data.mensaje); location.reload(); });
+        }
+        function bloquear() {
+            if(confirm("¿Activar protocolo de blindaje?")) {
+                $.post('/bloqueo', function(data) { alert(data.mensaje); location.reload(); });
+            }
+        }
+    </script>
 </body>
 </html>
+
+        
