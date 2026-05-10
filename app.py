@@ -1,64 +1,101 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file
-from flask_sqlalchemy import SQLAlchemy
-import hashlib, time, os
-import numpy as np
-import soundfile as sf
+from flask import Flask, render_template, request, jsonify
+import subprocess
+import sqlite3
+from datetime import datetime
+import re
 
+# --- CONFIGURACIÓN ESTRATÉGICA CHRONO SHIELD ---
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chrono_shield.db'
-app.config['SECRET_KEY'] = 'DANIEL_CEO_777'
-db = SQLAlchemy(app)
 
-# Modelo de Base de Datos Blindada
-class Message(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    sender = db.Column(db.String(50))
-    content = db.Column(db.Text)
-    timestamp = db.Column(db.String(20))
+# Estado del Blindaje (Protocolo de Defensa)
+modo_blindado = False
+ip_autorizada = "127.0.0.1"
 
-with app.app_context():
-    db.create_all()
+# --- NÚCLEO DE DATOS (SQLite) ---
+def init_db():
+    conn = sqlite3.connect('db.sqlite')
+    cursor = conn.cursor()
+    # Registramos: Fecha, Identidad, Evento e IP de origen
+    cursor.execute('''CREATE TABLE IF NOT EXISTS logs 
+                      (fecha TEXT, usuario TEXT, estado TEXT, ip TEXT)''')
+    conn.commit()
+    conn.close()
 
-# Motor AAP (Acoustic Anomaly Protocol)
-def generate_ultrasound(text):
-    filename = f"static/audio/msg_{int(time.time())}.wav"
-    os.makedirs('static/audio', exist_ok=True)
-    binary_msg = ''.join(format(ord(i), '08b') for i in text)
-    fs = 44100
-    t = np.linspace(0, 0.05, int(fs * 0.05))
-    audio_signal = np.array([])
-    for bit in binary_msg:
-        freq = 19500 if bit == '1' else 18500
-        audio_signal = np.concatenate((audio_signal, 0.5 * np.sin(2 * np.pi * freq * t)))
-    sf.write(filename, audio_signal, fs)
-    return filename
+# Inicializamos la DB al arrancar
+init_db()
+
+# --- MIDDLEWARE DE SEGURIDAD (EL ESCUDO) ---
+@app.before_request
+def verificar_blindaje():
+    global modo_blindado
+    # Si el blindaje está ON, solo el CEO (localhost) puede entrar
+    if modo_blindado:
+        if request.remote_addr not in [ip_autorizada, "192.168.1.15"]:
+            return "<h1 style='color:cyan; background:black; text-align:center; padding:50px;'>" \
+                   "ACCESO DENEGADO: CHRONO SHIELD ACTIVE (PROTOCOLO BOGOTÁ)</h1>", 403
+
+# --- RUTAS DE MANDO ---
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    conn = sqlite3.connect('db.sqlite')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM logs ORDER BY fecha DESC LIMIT 10")
+    logs = cursor.fetchall()
+    
+    # Intentamos obtener el último conteo de dispositivos
+    cursor.execute("SELECT estado FROM logs WHERE usuario='AUDITOR' ORDER BY fecha DESC LIMIT 1")
+    ultimo_log = cursor.fetchone()
+    num_dispositivos = 0
+    if ultimo_log:
+        match = re.search(r'\d+', ultimo_log[0])
+        if match: num_dispositivos = match.group()
 
-@app.route('/login', methods=['POST'])
-def login():
-    user = request.form.get('username')
-    return redirect(url_for('dashboard', user=user))
+    stats = {
+        "usuarios": num_dispositivos,
+        "motor": "NMAP TACTICAL",
+        "status": "LOCKDOWN" if modo_blindado else "NORMAL",
+        "ceo": "DANIEL GONZALES"
+    }
+    conn.close()
+    return render_template('index.html', logs=logs, stats=stats)
 
-@app.route('/dashboard/<user>')
-def dashboard(user):
-    msgs = Message.query.order_by(Message.id.desc()).limit(10).all()
-    uid = hashlib.sha256(user.encode()).hexdigest()[:10]
-    avatar = f"https://www.gravatar.com/avatar/{hashlib.md5(user.encode()).hexdigest()}?d=identicon"
-    return render_template('dashboard.html', user=user, uid=uid, avatar=avatar, msgs=msgs)
+@app.route('/ejecutar', methods=['POST'])
+def ejecutar():
+    ahora = datetime.now().strftime("%H:%M:%S")
+    try:
+        # Escaneo de red local (Asegúrate de tener nmap instalado: pkg install nmap)
+        output = subprocess.check_output(['nmap', '-sn', '192.168.1.0/24'], text=True)
+        vivos = len(re.findall(r"Host is up", output))
+        msg = f"Auditoría: {vivos} dispositivos identificados en red."
+    except Exception as e:
+        msg = "Error: Motor Nmap no detectado o sin permisos."
 
-@app.route('/send', methods=['POST'])
-def send():
-    user = request.form.get('user')
-    msg_text = request.form.get('message')
-    new_msg = Message(sender=user, content=msg_text, timestamp=time.strftime('%H:%M:%S'))
-    db.session.add(new_msg)
-    db.session.commit()
-    # Generar audio AAP automáticamente
-    generate_ultrasound(msg_text)
-    return redirect(url_for('dashboard', user=user))
+    conn = sqlite3.connect('db.sqlite')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO logs (fecha, usuario, estado, ip) VALUES (?, ?, ?, ?)",
+                   (ahora, "AUDITOR", msg, "GATEWAY_SCAN"))
+    conn.commit()
+    conn.close()
+    return jsonify({"mensaje": msg})
 
+@app.route('/bloqueo', methods=['POST'])
+def bloqueo():
+    global modo_blindado
+    ahora = datetime.now().strftime("%H:%M:%S")
+    modo_blindado = True
+    
+    msg = "SISTEMA BLINDADO: Bloqueo de intrusos activado."
+    
+    conn = sqlite3.connect('db.sqlite')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO logs (fecha, usuario, estado, ip) VALUES (?, ?, ?, ?)",
+                   (ahora, "DEFENSE_UNIT", msg, "FIREWALL_ON"))
+    conn.commit()
+    conn.close()
+    return jsonify({"mensaje": "Protocolo de Blindaje Ejecutado Correctamente."})
+
+# --- ARRANQUE CORPORATIVO ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Lanzamos en el puerto 5000 abierto para la red local
+    app.run(host='0.0.0.0', port=5000, debug=True)
