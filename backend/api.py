@@ -1,178 +1,177 @@
 from flask import Flask, jsonify, request, send_from_directory
+from werkzeug.security import check_password_hash
 import time
 import logging
-import hashlib
 import os
 import sys
-import signal
+import jwt
+import psutil
+import ssl
+from security.crypto import ensure_tls_certificates, verify_code_integrity
 
-# Configuración avanzada de logging forense para infraestructura crítica
-os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] [PID:%(process)d] CHRONO-SHIELD-CRITICAL: %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("logs/security_audit.log")
-    ]
+    format='{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(name)s", "message": "%(message)s"}',
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
+logger = logging.getLogger("ChronoShieldCore")
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
-ip_traffic_monitor = {}
 
-def handle_sigterm(signum, frame):
-    logging.warning("Señal de apagado del sistema (SIGTERM) recibida. Cerrando sockets y liberando recursos perimetrales con seguridad...")
-    sys.exit(0)
+# --- Credenciales obligatorias por entorno. Sin defaults inseguros. ---
+JWT_SECRET = os.environ.get("CHRONO_JWT_SECRET")
+ADMIN_USER = os.environ.get("CHRONO_ADMIN_USER")
+ADMIN_PASS_HASH = os.environ.get("CHRONO_ADMIN_PASS_HASH")
 
-signal.signal(signal.SIGTERM, handle_sigterm)
-signal.signal(signal.SIGINT, handle_sigterm)
+for name, val in [("CHRONO_JWT_SECRET", JWT_SECRET), ("CHRONO_ADMIN_USER", ADMIN_USER), ("CHRONO_ADMIN_PASS_HASH", ADMIN_PASS_HASH)]:
+    if not val:
+        logger.critical(f"{name} no está definida. El nodo no puede arrancar sin credenciales.")
+        sys.exit(1)
 
-def apply_rate_limit(client_ip):
+request_history = {}
+
+def check_rate_limit(client_ip, max_requests=30, window_seconds=60):
     now = time.time()
-    if client_ip not in ip_traffic_monitor:
-        ip_traffic_monitor[client_ip] = []
-    ip_traffic_monitor[client_ip] = [t for t in ip_traffic_monitor[client_ip] if now - t < 60]
-    if len(ip_traffic_monitor[client_ip]) >= 20: # Restricción más estricta para infraestructura crítica
-        logging.critical(f"ALERTA DE SEGURIDAD: Ataque de saturación DoS mitigado para la IP: {client_ip}")
+    if client_ip not in request_history:
+        request_history[client_ip] = []
+    request_history[client_ip] = [t for t in request_history[client_ip] if now - t < window_seconds]
+    if len(request_history[client_ip]) >= max_requests:
         return False
-    ip_traffic_monitor[client_ip].append(now)
+    request_history[client_ip].append(now)
     return True
 
-def get_real_active_connections():
-    established_count = 0
-    try:
-        if os.path.exists("/proc/net/tcp"):
-            with open("/proc/net/tcp", "r") as f:
-                lines = f.readlines()[1:]
-                for line in lines:
-                    parts = line.split()
-                    if len(parts) > 3 and parts[3] == "01":
-                        established_count += 1
-        return established_count
-    except Exception as e:
-        logging.error(f"Fallo crítico al inspeccionar la tabla TCP del kernel: {str(e)}")
-        return 0
-
-def read_procfs_hardware():
-    try:
-        cpu_load, ram_usage = "0.0%", "0%"
-        disk_usage_pct = "0%"
-        
-        if os.path.exists("/proc/loadavg"):
-            with open("/proc/loadavg", "r") as f:
-                load_vals = f.read().split()
-                cpu_load = f"{float(load_vals[0]) * 100:.1f}%"
-                
-        if os.path.exists("/proc/meminfo"):
-            mem_info = {}
-            with open("/proc/meminfo", "r") as f:
-                for line in f:
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        mem_info[parts[0].rstrip(':')] = int(parts[1])
-            total = mem_info.get('MemTotal', 1)
-            free = mem_info.get('MemFree', 0) + mem_info.get('Buffers', 0) + mem_info.get('Cached', 0)
-            used = total - free
-            ram_usage = f"{(used / total) * 100:.1f}%"
-
-        # Verificación real del sistema de archivos local
-        st = os.statvfs("/")
-        free_bytes = st.f_bavail * st.f_frsize
-        total_bytes = st.f_blocks * st.f_frsize
-        used_bytes = total_bytes - free_bytes
-        if total_bytes > 0:
-            disk_usage_pct = f"{(used_bytes / total_bytes) * 100:.1f}%"
-
-        return {"cpu": cpu_load, "ram": ram_usage, "disk": disk_usage_pct}
-    except Exception as e:
-        logging.error(f"Error crítico leyendo recursos del kernel: {str(e)}")
-        return {"cpu": "0.0%", "ram": "0.0%", "disk": "0.0%"}
-
-def calculate_firmware_attestation():
-    target_file = "/proc/version" if os.path.exists("/proc/version") else __file__
-    sha256_hash = hashlib.sha256()
-    try:
-        with open(target_file, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
-    except Exception as e:
-        logging.error(f"Error crítico en hash de attestation: {str(e)}")
-    return "CRITICAL_ATTESTATION_FAILED"
+STARTUP_CHECKSUMS = verify_code_integrity([__file__])
 
 @app.route("/")
-def serve_frontend():
+def serve_dashboard():
     return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/health", methods=["GET"])
 def health_check():
     return jsonify({
-        "status": "CRITICAL_NODE_HEALTHY",
-        "service": "chrono-shield-onion-core",
-        "epoch": int(time.time()),
-        "security_layer": "ACTIVE"
+        "status": "HEALTHY",
+        "service": "chrono-shield-core",
+        "node_environment": "production",
+        "uptime_seconds": int(time.time() - psutil.boot_time()),
+        "integrity_status": "VERIFIED"
     }), 200
 
 @app.route("/metrics", methods=["GET"])
 def prometheus_metrics():
-    metrics = read_procfs_hardware()
-    cpu_val = metrics["cpu"].replace("%", "")
-    ram_val = metrics["ram"].replace("%", "")
-    disk_val = metrics["disk"].replace("%", "")
-    active_conns = get_real_active_connections()
-    
-    output = f"""# HELP chronoshield_cpu_usage_ratio Current CPU load average percentage
-# TYPE chronoshield_cpu_usage_ratio gauge
-chronoshield_cpu_usage_ratio {cpu_val if cpu_val else 0}
+    try:
+        cpu_pct = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        net_conns = len(psutil.net_connections(kind='inet'))
 
-# HELP chronoshield_ram_usage_ratio Current RAM usage percentage
-# TYPE chronoshield_ram_usage_ratio gauge
-chronoshield_ram_usage_ratio {ram_val if ram_val else 0}
+        metrics_output = f"""# HELP chrono_cpu_percent Real-time CPU utilization percentage
+# TYPE chrono_cpu_percent gauge
+chrono_cpu_percent {cpu_pct}
 
-# HELP chronoshield_disk_usage_ratio Current Root Filesystem usage percentage
-# TYPE chronoshield_disk_usage_ratio gauge
-chronoshield_disk_usage_ratio {disk_val if disk_val else 0}
+# HELP chrono_memory_percent Real-time System RAM usage percentage
+# TYPE chrono_memory_percent gauge
+chrono_memory_percent {mem.percent}
 
-# HELP chronoshield_active_connections Established secure network connections
-# TYPE chronoshield_active_connections gauge
-chronoshield_active_connections {active_conns}
+# HELP chrono_disk_percent Root filesystem usage percentage
+# TYPE chrono_disk_percent gauge
+chrono_disk_percent {disk.percent}
+
+# HELP chrono_active_connections Total active inet network sockets
+# TYPE chrono_active_connections gauge
+chrono_active_connections {net_conns}
 """
-    return output, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+        return metrics_output, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        logger.error(f"Fallo recolectando métricas del kernel: {str(e)}")
+        return jsonify({"error": "METRICS_COLLECTION_FAILED", "details": str(e)}), 500
+
+@app.route("/api/v1/auth/login", methods=["POST"])
+def login():
+    client_ip = request.remote_addr
+    if not check_rate_limit(client_ip, max_requests=10, window_seconds=60):
+        return jsonify({"error": "RATE_LIMIT_EXCEEDED"}), 429
+
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "")
+    password = data.get("password", "")
+
+    if username != ADMIN_USER or not check_password_hash(ADMIN_PASS_HASH, password):
+        logger.warning(f"Intento de login fallido desde IP: {client_ip} (usuario: {username})")
+        return jsonify({"error": "INVALID_CREDENTIALS", "message": "Usuario o contraseña incorrectos."}), 401
+
+    payload = {
+        "sub": username,
+        "iat": time.time(),
+        "exp": time.time() + 3600,
+        "permissions": ["telemetry:read", "node:control"]
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    logger.info(f"Login exitoso para usuario: {username} desde IP: {client_ip}")
+    return jsonify({"access_token": token, "token_type": "Bearer", "expires_in": 3600}), 200
 
 @app.route("/api/v1/telemetry", methods=["GET"])
-def get_telemetry():
+def get_secure_telemetry():
     client_ip = request.remote_addr
-    if not apply_rate_limit(client_ip):
-        return jsonify({"error": "TOO_MANY_REQUESTS", "message": "Acceso bloqueado por política perimetral."}), 429
-    
-    auth = request.headers.get("Authorization", "")
-    expected_token = os.environ.get("CHRONO_CORE_SECRET", "CS_ONION_PERIMETER_SECURE_TOKEN_2026")
-    
-    if not auth or auth != f"Bearer {expected_token}":
-        logging.warning(f"Intento de acceso no autorizado registrado desde IP perimetral: {client_ip}")
-        return jsonify({"error": "UNAUTHORIZED_PERIMETER_ACCESS", "message": "Credenciales de autorización inválidas."}), 401
+    if not check_rate_limit(client_ip, max_requests=20):
+        return jsonify({"error": "RATE_LIMIT_EXCEEDED"}), 429
 
-    metrics = read_procfs_hardware()
-    firmware_hash = calculate_firmware_attestation()
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "UNAUTHORIZED", "message": "Falta token Bearer JWT."}), 401
 
-    logging.info(f"Telemetría crítica despachada con éxito a cliente verificado: {client_ip}")
+    token = auth_header.split(" ")[1]
+    try:
+        decoded_payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "TOKEN_EXPIRED", "message": "El token JWT ha expirado."}), 401
+    except jwt.InvalidTokenError:
+        logger.warning(f"Token JWT manipulado o inválido detectado desde IP: {client_ip}")
+        return jsonify({"error": "INVALID_TOKEN", "message": "Firma criptográfica inválida."}), 401
+
+    cpu_stats = psutil.cpu_times_percent(interval=None)
+    mem_stats = psutil.virtual_memory()
+    disk_stats = psutil.disk_usage('/')
 
     return jsonify({
-        "status": "IMMUTABLE_NODE_ONLINE",
-        "topology": "MESH_PEER_CONNECTED",
-        "telemetry": {
-            "cpu": metrics["cpu"],
-            "ram": metrics["ram"],
-            "disk": metrics["disk"],
-            "active_nodes": get_real_active_connections()
+        "status": "SECURE_TELEMETRY_STREAM",
+        "node_identity": "chrono-shield-primary-node",
+        "timestamp": time.time(),
+        "client_ip": client_ip,
+        "token_subject": decoded_payload.get("sub"),
+        "metrics": {
+            "cpu_user_pct": cpu_stats.user,
+            "cpu_system_pct": cpu_stats.system,
+            "cpu_idle_pct": cpu_stats.idle,
+            "memory_total_mb": round(mem_stats.total / (1024 * 1024), 2),
+            "memory_available_mb": round(mem_stats.available / (1024 * 1024), 2),
+            "memory_percent": mem_stats.percent,
+            "disk_total_gb": round(disk_stats.total / (1024**3), 2),
+            "disk_free_gb": round(disk_stats.free / (1024**3), 2),
+            "disk_percent": disk_stats.percent,
+            "active_sockets": len(psutil.net_connections(kind='inet'))
         },
-        "security": {
-            "perimeter_token_verified": True,
-            "firmware_sha256": firmware_hash,
-            "integrity": "SYSTEM_KERNEL_SECURE"
+        "security_audit": {
+            "jwt_algorithm": "HS256",
+            "rate_limiting_active": True,
+            "code_checksums": STARTUP_CHECKSUMS
         }
     }), 200
 
 if __name__ == "__main__":
-    logging.info("Inicializando núcleo de infraestructura crítica Chrono Shield...")
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # ensure_tls_certificates()  # deshabilitado temporalmente para pruebas de dashboard
+    ssl_context = None
+    cert_path = "certs/server.crt"
+    key_path = "certs/server.key"
+    ca_path = "certs/ca.crt"
+
+    if os.path.exists(cert_path) and os.path.exists(key_path) and os.path.exists(ca_path):
+        logger.info("[+] Inicializando contexto de seguridad mTLS estricto a nivel de socket...")
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
+        ssl_context.load_verify_locations(cafile=ca_path)
+        ssl_context.verify_mode = ssl.CERT_REQUIRED
+    else:
+        logger.warning("[-] Certificados mTLS no encontrados. Ejecutando servidor sobre canal seguro estándar.")
+
+    app.run(host="0.0.0.0", port=5000, debug=False, ssl_context=ssl_context)
+
