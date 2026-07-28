@@ -3,66 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chrono Shield Networks - Perimetral Dashboard</title>
+    <title>Chrono Shield Networks - Critical Infrastructure Console</title>
     <style>
-        body { background-color: #0b0f19; color: #00ffcc; font-family: monospace; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; border: 1px solid #1e293b; padding: 20px; background: #0f172a; border-radius: 8px; }
-        h1 { border-bottom: 1px solid #1e293b; padding-bottom: 10px; font-size: 1.5rem; }
-        .metric-card { background: #1e293b; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        body { background-color: #05070b; color: #00ffcc; font-family: monospace; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; border: 1px solid #1e293b; padding: 25px; background: #0b0f19; border-radius: 6px; box-shadow: 0 0 20px rgba(0,255,204,0.05); }
+        h1 { border-bottom: 1px solid #1e293b; padding-bottom: 12px; font-size: 1.4rem; color: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .metric-card { background: #0f172a; border: 1px solid #1e293b; padding: 15px; border-radius: 4px; }
+        .metric-card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #94a3b8; }
+        .metric-card p { margin: 0; font-size: 1.3rem; font-weight: bold; color: #00ffcc; }
         .status-online { color: #10b981; font-weight: bold; }
-        button { background: #00ffcc; color: #0b0f19; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; }
-        button:hover { background: #059669; color: #fff; }
+        .refresh-bar { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        button { background: #00ffcc; color: #05070b; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #10b981; color: #fff; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>CHRONO SHIELD NETWORKS // CORE PANEL</h1>
-        <p>Estado del Nodo: <span id="node-status" class="status-online">CONECTANDO...</span></p>
+        <h1>CHRONO SHIELD NETWORKS // INFRAESTRUCTURA CRÍTICA</h1>
+        <p>Estado del Nodo Perimetral: <span id="node-status" class="status-online">SINCRONIZANDO...</span></p>
         
-        <div class="metric-card">
-            <h3>Carga de CPU</h3>
-            <p id="cpu-val">Calculando...</p>
-        </div>
-        
-        <div class="metric-card">
-            <h3>Consumo de RAM</h3>
-            <p id="ram-val">Calculando...</p>
+        <div class="grid">
+            <div class="metric-card">
+                <h3>Carga de Procesador (CPU)</h3>
+                <p id="cpu-val">--</p>
+            </div>
+            <div class="metric-card">
+                <h3>Memoria RAM Activa</h3>
+                <p id="ram-val">--</p>
+            </div>
+            <div class="metric-card">
+                <h3>Almacenamiento Raíz (Disk)</h3>
+                <p id="disk-val">--</p>
+            </div>
+            <div class="metric-card">
+                <h3>Conexiones TCP Establecidas</h3>
+                <p id="conns-val">--</p>
+            </div>
         </div>
 
-        <div class="metric-card">
-            <h3>Conexiones Activas (TCP)</h3>
-            <p id="conns-val">Calculando...</p>
+        <div class="refresh-bar">
+            <span>Actualización automática cada 5s</span>
+            <button onclick="fetchTelemetry()">Forzar Sincronización</button>
         </div>
-
-        <button onclick="fetchTelemetry()">Actualizar Telemetría</button>
     </div>
 
     <script>
         async function fetchTelemetry() {
             try {
-                // Nota: Para consumir /api/v1/telemetry requiere Bearer Token. Usaremos /health y /metrics de forma pública o simulación directa de UI.
                 const res = await fetch('/health');
                 const data = await res.json();
                 document.getElementById('node-status').innerText = data.status;
 
-                // Lectura abierta desde /metrics para el dashboard web público
                 const metricsRes = await fetch('/metrics');
                 const metricsText = await metricsRes.text();
                 
-                // Parseo simple de Prometheus text format
                 const lines = metricsText.split('\n');
-                let cpu = "0%", ram = "0%", conns = "0";
+                let cpu = "0%", ram = "0%", disk = "0%", conns = "0";
                 lines.forEach(line => {
                     if (line.startsWith('chronoshield_cpu_usage_ratio')) cpu = line.split(' ')[1] + '%';
                     if (line.startsWith('chronoshield_ram_usage_ratio')) ram = line.split(' ')[1] + '%';
+                    if (line.startsWith('chronoshield_disk_usage_ratio')) disk = line.split(' ')[1] + '%';
                     if (line.startsWith('chronoshield_active_connections')) conns = line.split(' ')[1];
                 });
 
                 document.getElementById('cpu-val').innerText = cpu;
                 document.getElementById('ram-val').innerText = ram;
+                document.getElementById('disk-val').innerText = disk;
                 document.getElementById('conns-val').innerText = conns;
             } catch (err) {
-                document.getElementById('node-status').innerText = "ERROR DE CONEXIÓN CON EL CORE";
+                document.getElementById('node-status').innerText = "ERROR CRÍTICO: PÉRDIDA DE ENLACE";
             }
         }
         setInterval(fetchTelemetry, 5000);
