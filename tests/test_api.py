@@ -1,8 +1,14 @@
 import pytest
 import sys
 import os
+from werkzeug.security import generate_password_hash
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../backend')))
+
+TEST_PASSWORD = "test-pass-ci-only-123"
+os.environ["CHRONO_JWT_SECRET"] = "test-secret-not-for-production-ci-only"
+os.environ["CHRONO_ADMIN_USER"] = "testadmin"
+os.environ["CHRONO_ADMIN_PASS_HASH"] = generate_password_hash(TEST_PASSWORD)
 
 from api import app, JWT_SECRET
 import jwt
@@ -26,12 +32,12 @@ def test_metrics_endpoint(client):
     assert b"chrono_cpu_percent" in response.data
     assert b"chrono_memory_percent" in response.data
 
-def test_jwt_token_generation_unauthorized(client):
-    response = client.post('/api/v1/auth/token', headers={"X-API-Key": "wrong-key"})
+def test_login_wrong_credentials(client):
+    response = client.post('/api/v1/auth/login', json={"username": "testadmin", "password": "wrong"})
     assert response.status_code == 401
 
-def test_jwt_token_generation_authorized(client):
-    response = client.post('/api/v1/auth/token', headers={"X-API-Key": "secure-node-production-master-key-2026"})
+def test_login_correct_credentials(client):
+    response = client.post('/api/v1/auth/login', json={"username": "testadmin", "password": TEST_PASSWORD})
     assert response.status_code == 200
     data = response.get_json()
     assert "access_token" in data
