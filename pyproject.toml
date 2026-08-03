@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chrono-shield-core"
+version = "1.0.0"
+description = "Secure telemetry and edge node monitoring framework"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask==3.0.2",
+    "psutil==5.9.8",
+    "PyJWT==2.8.0"
+]

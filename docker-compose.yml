@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  chrono-core:
+    build: .
+    container_name: chrono-shield-core
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - CHRONO_API_KEY=production-secure-key-2026
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

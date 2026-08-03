@@ -1,0 +1,11 @@
+.env.local
+.env.local
+certs/
+*.pem
+*.key
+__pycache__/
+*.pyc
+__pycache__/
+*.pyc
+__pycache__/
+*.pyc

@@ -2,22 +2,126 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Chrono Shield - Enterprise Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrono Shield Core | Secure Operations Dashboard</title>
     <style>
-        body { background: #0f172a; color: #f8fafc; font-family: sans-serif; padding: 24px; }
-        header { border-bottom: 2px solid #0ea5e9; padding-bottom: 16px; }
-        .panel { background: #0b0f19; border: 1px dashed #0ea5e9; padding: 20px; margin-top: 20px; }
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #111827;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #1f2937;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; margin-bottom: 25px; }
+        h1 { font-size: 1.5rem; letter-spacing: 2px; color: var(--accent-green); }
+        .status-badge { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); color: var(--accent-green); padding: 5px 12px; border-radius: 4px; font-size: 0.85rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h3 { font-size: 1rem; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; }
+        .metric-value { font-size: 2.2rem; font-weight: bold; color: var(--text-main); margin-bottom: 10px; }
+        .progress-bar { width: 100%; height: 8px; background: #374151; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent-green); transition: width 0.4s ease; }
+        .console-box { background: #030712; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; height: 220px; overflow-y: auto; font-size: 0.85rem; color: #34d399; }
+        .controls { margin-top: 25px; display: flex; gap: 15px; }
+        button { background: #1f2937; color: var(--text-main); border: 1px solid #4b5563; padding: 10px 20px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #374151; border-color: var(--accent-green); }
     </style>
 </head>
 <body>
     <header>
-        <h1>CHRONO SHIELD NETWORKS</h1>
-        <div style="color:#0ea5e9;">Infraestructura Autónoma // ID-Nodo: active_perimeter_node_01</div>
+        <h1>[ CHRONO SHIELD // CORE MONITOR ]</h1>
+        <div class="status-badge" id="system-status">ESTADO: CONECTADO</div>
     </header>
-    <div class="panel">
-        <h3>TELEMETRÍA PERIMETRAL EN TIEMPO REAL</h3>
-        <p>Estado del Canal Criptográfico: <span style="color: #10b981;">ESTABLE // ONLINE</span></p>
+    <div class="grid">
+        <div class="card">
+            <h3>Carga CPU</h3>
+            <div class="metric-value" id="cpu-val">0.0%</div>
+            <div class="progress-bar"><div class="progress-fill" id="cpu-bar" style="width: 0%;"></div></div>
+        </div>
+        <div class="card">
+            <h3>Memoria RAM</h3>
+            <div class="metric-value" id="ram-val">0.0%</div>
+            <div class="progress-bar"><div class="progress-fill" id="ram-bar" style="width: 0%;"></div></div>
+        </div>
+        <div class="card">
+            <h3>Disco Raíz</h3>
+            <div class="metric-value" id="disk-val">0.0%</div>
+            <div class="progress-bar"><div class="progress-fill" id="disk-bar" style="width: 0%;"></div></div>
+        </div>
+        <div class="card">
+            <h3>Conexiones Activas</h3>
+            <div class="metric-value" id="conn-val">0</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Sockets TCP/Inet del Kernel</div>
+        </div>
     </div>
-    <p style="font-size:9px; opacity:0.4; margin-top:40px;">CUMPLIMIENTO DE LA LEY 1581 DE 2012 (HABEAS DATA).</p>
+    <div class="card">
+        <h3>Registro de Actividad y Auditoría mTLS</h3>
+        <div class="console-box" id="console-logs">
+            [+] Inicializando interfaz de monitoreo perimetral...<br>
+            [+] Conexión establecida con el nodo local protegido.<br>
+        </div>
+    </div>
+    <div class="controls">
+        <button onclick="fetchMetrics()">Actualizar Ahora</button>
+        <button onclick="testTelemetryAPI()">Probar API Segura JWT</button>
+    </div>
+    <script>
+        function log(msg) {
+            const box = document.getElementById('console-logs');
+            box.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+            box.scrollTop = box.scrollHeight;
+        }
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/metrics');
+                const text = await response.text();
+                const lines = text.split('\n');
+                let cpu = 0, ram = 0, disk = 0, conns = 0;
+                lines.forEach(line => {
+                    if (line.startsWith('chrono_cpu_percent')) cpu = parseFloat(line.split(' ')[1]);
+                    if (line.startsWith('chrono_memory_percent')) ram = parseFloat(line.split(' ')[1]);
+                    if (line.startsWith('chrono_disk_percent')) disk = parseFloat(line.split(' ')[1]);
+                    if (line.startsWith('chrono_active_connections')) conns = parseInt(line.split(' ')[1]);
+                });
+                document.getElementById('cpu-val').innerText = cpu.toFixed(1) + '%';
+                document.getElementById('cpu-bar').style.width = cpu + '%';
+                document.getElementById('ram-val').innerText = ram.toFixed(1) + '%';
+                document.getElementById('ram-bar').style.width = ram + '%';
+                document.getElementById('disk-val').innerText = disk.toFixed(1) + '%';
+                document.getElementById('disk-bar').style.width = disk + '%';
+                document.getElementById('conn-val').innerText = conns;
+                log("Métricas actualizadas correctamente desde el kernel.");
+            } catch (err) {
+                log("ERROR: Fallo al conectar con el endpoint de métricas.");
+                document.getElementById('system-status').style.color = 'var(--accent-red)';
+                document.getElementById('system-status').innerText = 'ESTADO: ERROR DE CONEXIÓN';
+            }
+        }
+        async function testTelemetryAPI() {
+            log("Solicitando token JWT autenticado...");
+            try {
+                const tokenRes = await fetch('/api/v1/auth/token', {
+                    method: 'POST',
+                    headers: { 'X-API-Key': 'secure-node-production-master-key-2026' }
+                });
+                if (!tokenRes.ok) throw new Error("Fallo en autenticación con API Key");
+                const tokenData = await tokenRes.json();
+                log("Token JWT obtenido. Consultando telemetría protegida...");
+                const telRes = await fetch('/api/v1/telemetry', {
+                    headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+                });
+                const telData = await telRes.json();
+                log(`Telemetría segura recibida. Sujeto: ${telData.token_subject}, CPU Usuario: ${telData.metrics.cpu_user_pct}%`);
+            } catch (err) {
+                log("ERROR: Autenticación rechazada o token inválido.");
+            }
+        }
+        setInterval(fetchMetrics, 5000);
+        window.onload = fetchMetrics;
+    </script>
 </body>
 </html>

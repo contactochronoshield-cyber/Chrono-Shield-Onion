@@ -1,12 +1,13 @@
-# CHRONO SHIELD NETWORKS — TECHNICAL SPECIFICATION
-**Producto:** Sistema de Telemetría Perimetral e Infraestructura Autónoma Inmutable  
-**Core Branch:** `Chrono-Shield-Onion`  
-**Autor:** Daniel Gonzales Martínez, CEO & Technical Architect  
+# Chrono Shield Onion: Arquitectura de Infraestructura Crítica y Red Perimetral
 
----
+## 1. Resumen Ejecutivo
+Chrono Shield Core provee un marco de infraestructura resiliente diseñado para entornos de enrutamiento descentralizado y aislamiento de nodos críticos.
 
-## 1. MANUAL DE ARQUITECTURA DE SEGURIDAD (WHITEPAPER)
-Nuestra solución implementa un modelo de VPS Distribuida en Hardware Perimetral (Routers Core). El procesamiento de datos y la capa de transporte se ejecutan de manera nativa e inmutable en los enrutadores de borde de la organización cliente.
+## 2. Componentes del Sistema
+- **Backend de Telemetría (Flask):** Extrae métricas del kernel mediante interfaces virtuales (`/proc/loadavg`, `/proc/meminfo`, `/proc/net/tcp`) para garantizar observabilidad en tiempo real sin sobrecarga.
+- **Seguridad Perimetral:** Implementación de mitigación DoS mediante control de ventanas temporales por IP (`rate limiting`) y validación de tokens de autorización perimetral.
+- **Attestation de Integridad:** Cálculo criptográfico SHA-256 de componentes críticos del sistema operativo para verificar la inmutabilidad en tiempo de ejecución.
+- **Frontend Asíncrono:** Interfaz de control web ligera integrada directamente en el servidor para visualización de métricas de rendimiento.
 
-## 2. GUÍA DE INSTALACIÓN
-La directiva intercepta las peticiones externas en el puerto corporativo `8080`, aplicando sanitización de cabeceras, mitigación de denegación de servicio (DoS) y enrutamiento estricto al backend de telemetría.
+## 3. Topología de Red y Mesh
+Diseñado para operar en nodos interconectados mediante túneles cifrados y enrutamiento poronion, asegurando la privacidad de las transacciones de datos y telemetría operativa.
