@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.security import check_password_hash
 import time
+PROCESS_START_TIME = time.time()
 import logging
 import os
 import sys
@@ -52,7 +53,7 @@ def health_check():
         "status": "HEALTHY",
         "service": "chrono-shield-core",
         "node_environment": "production",
-        "uptime_seconds": int(time.time() - psutil.boot_time()),
+        "uptime_seconds": int(time.time() - PROCESS_START_TIME),
         "integrity_status": "VERIFIED"
     }), 200
 
