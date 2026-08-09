@@ -19,7 +19,6 @@ logger = logging.getLogger("ChronoShieldCore")
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 
-# --- Credenciales obligatorias por entorno. Sin defaults inseguros. ---
 JWT_SECRET = os.environ.get("CHRONO_JWT_SECRET")
 ADMIN_USER = os.environ.get("CHRONO_ADMIN_USER")
 ADMIN_PASS_HASH = os.environ.get("CHRONO_ADMIN_PASS_HASH")
@@ -29,6 +28,7 @@ for name, val in [("CHRONO_JWT_SECRET", JWT_SECRET), ("CHRONO_ADMIN_USER", ADMIN
         logger.critical(f"{name} no está definida. El nodo no puede arrancar sin credenciales.")
         sys.exit(1)
 
+PROCESS_START_TIME = time.time()
 request_history = {}
 
 def check_rate_limit(client_ip, max_requests=30, window_seconds=60):
@@ -159,14 +159,10 @@ def get_secure_telemetry():
     }), 200
 
 if __name__ == "__main__":
-    # ensure_tls_certificates()  # deshabilitado temporalmente para pruebas de dashboard
     ssl_context = None
-    cert_path = "certs/server.crt"
-    key_path = "certs/server.key"
-    ca_path = "certs/ca.crt"
-
+    cert_path, key_path, ca_path = "certs/server.crt", "certs/server.key", "certs/ca.crt"
     if os.path.exists(cert_path) and os.path.exists(key_path) and os.path.exists(ca_path):
-        logger.info("[+] Inicializando contexto de seguridad mTLS estricto a nivel de socket...")
+        logger.info("[+] Inicializando contexto de seguridad mTLS a nivel de socket...")
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
         ssl_context.load_verify_locations(cafile=ca_path)
@@ -175,4 +171,3 @@ if __name__ == "__main__":
         logger.warning("[-] Certificados mTLS no encontrados. Ejecutando servidor sobre canal seguro estándar.")
 
     app.run(host="0.0.0.0", port=5000, debug=False, ssl_context=ssl_context)
-
