@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.security import check_password_hash
 import time
+PROCESS_START_TIME = time.time()
 import logging
 import os
 import sys
