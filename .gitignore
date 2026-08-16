@@ -10,3 +10,4 @@ __pycache__/
 __pycache__/
 *.pyc
 csn-web/
+backend/mesh_peers.db
