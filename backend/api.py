@@ -159,15 +159,4 @@ def get_secure_telemetry():
     }), 200
 
 if __name__ == "__main__":
-    ssl_context = None
-    cert_path, key_path, ca_path = "certs/server.crt", "certs/server.key", "certs/ca.crt"
-    if os.path.exists(cert_path) and os.path.exists(key_path) and os.path.exists(ca_path):
-        logger.info("[+] Inicializando contexto de seguridad mTLS a nivel de socket...")
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
-        ssl_context.load_verify_locations(cafile=ca_path)
-        ssl_context.verify_mode = ssl.CERT_REQUIRED
-    else:
-        logger.warning("[-] Certificados mTLS no encontrados. Ejecutando servidor sobre canal seguro estándar.")
-
-    app.run(host="0.0.0.0", port=5000, debug=False, ssl_context=ssl_context)
+    app.run(host="0.0.0.0", port=5000, debug=False)
