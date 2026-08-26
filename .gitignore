@@ -9,3 +9,4 @@ __pycache__/
 *.pyc
 __pycache__/
 *.pyc
+mesh_peers.db
