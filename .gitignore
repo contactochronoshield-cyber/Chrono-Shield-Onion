@@ -1,12 +1,9 @@
 .env.local
-.env.local
 certs/
 *.pem
 *.key
 __pycache__/
 *.pyc
-__pycache__/
-*.pyc
-__pycache__/
-*.pyc
 mesh_peers.db
+backend/mesh_peers.db
+csn-web/
