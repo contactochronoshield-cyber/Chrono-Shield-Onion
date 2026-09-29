@@ -7,6 +7,8 @@ import os
 import sqlite3
 import threading
 from security.crypto import ensure_tls_certificates
+from security.config_integrity import check_integrity, establish_baseline
+from security.alert_dispatcher import send_alert
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +57,17 @@ def log_anomaly(node_id, anomaly_type, detail):
     conn.commit()
     conn.close()
     logger.warning(f"ANOMALIA [{anomaly_type}] nodo={node_id}: {detail}")
+    send_alert(f"[{anomaly_type}] nodo={node_id}: {detail}")
+
+def config_watcher():
+    while True:
+        try:
+            changes = check_integrity()
+            for c in changes:
+                log_anomaly(NODE_ID, "CONFIG_TAMPERED", f"Archivo modificado sin autorizacion: {c['path']}")
+        except Exception as e:
+            logger.error(f"Error en config_watcher: {e}")
+        time.sleep(30)
 
 def offline_watcher():
     known_online = {}
@@ -132,8 +145,11 @@ if __name__ == "__main__":
         logger.critical("Certificados mTLS requeridos para el canal mesh. Abortando arranque.")
         sys.exit(1)
 
+    establish_baseline()
     watcher_thread = threading.Thread(target=offline_watcher, daemon=True)
     watcher_thread.start()
+    config_thread = threading.Thread(target=config_watcher, daemon=True)
+    config_thread.start()
 
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
