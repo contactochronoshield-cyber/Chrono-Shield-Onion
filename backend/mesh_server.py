@@ -63,11 +63,43 @@ def config_watcher():
     while True:
         try:
             changes = check_integrity()
-            for c in changes:
-                log_anomaly(NODE_ID, "CONFIG_TAMPERED", f"Archivo modificado sin autorizacion: {c['path']}")
+            if changes:
+                for c in changes:
+                    log_anomaly(NODE_ID, "CONFIG_TAMPERED", f"Archivo modificado sin autorizacion: {c['path']}")
+                establish_baseline()
         except Exception as e:
             logger.error(f"Error en config_watcher: {e}")
         time.sleep(30)
+
+CORRELATION_WINDOW_SECONDS = 120
+CORRELATION_MIN_NODES = 2
+
+def correlation_watcher():
+    seen_correlations = set()
+    while True:
+        try:
+            now = time.time()
+            conn = get_db()
+            rows = conn.execute(
+                "SELECT node_id, anomaly_type, detected_at FROM anomalies WHERE detected_at > ? AND anomaly_type != 'COORDINATED_PATTERN'",
+                (now - CORRELATION_WINDOW_SECONDS,)
+            ).fetchall()
+            conn.close()
+
+            by_type = {}
+            for node_id, atype, detected_at in rows:
+                by_type.setdefault(atype, set()).add(node_id)
+
+            for atype, nodes in by_type.items():
+                if len(nodes) >= CORRELATION_MIN_NODES:
+                    key = (atype, tuple(sorted(nodes)))
+                    if key not in seen_correlations:
+                        seen_correlations.add(key)
+                        detail = f"Mismo tipo de anomalia ({atype}) en {len(nodes)} nodos distintos en {CORRELATION_WINDOW_SECONDS}s: {sorted(nodes)}"
+                        log_anomaly("MESH_WIDE", "COORDINATED_PATTERN", detail)
+        except Exception as e:
+            logger.error(f"Error en correlation_watcher: {e}")
+        time.sleep(15)
 
 def offline_watcher():
     known_online = {}
@@ -150,6 +182,8 @@ if __name__ == "__main__":
     watcher_thread.start()
     config_thread = threading.Thread(target=config_watcher, daemon=True)
     config_thread.start()
+    correlation_thread = threading.Thread(target=correlation_watcher, daemon=True)
+    correlation_thread.start()
 
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
