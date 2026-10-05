@@ -29,15 +29,23 @@
 ### 1.5 Distribución en Red Mesh y Detección de Anomalías
 ✅ **Implementado y probado end-to-end** — Canal mesh con persistencia SQLite (sobrevive a reinicios del proceso, verificado). Cada nodo peer se autentica por certificado propio y reporta estado vía `/mesh/heartbeat`.
 
-✅ **Implementado y probado** — **Detección distribuida de anomalías**: el nodo principal analiza cada heartbeat en tiempo real y detecta automáticamente (a) CPU anómalo sostenido por encima de umbral configurable, y (b) pérdida de conectividad de un peer (sin heartbeat por más de 30s). Los eventos quedan persistidos y consultables vía `/mesh/anomalies`.
+✅ **Implementado y probado** — **Detección distribuida de anomalías**: el nodo principal analiza cada heartbeat en tiempo real y detecta automáticamente (a) CPU anómalo sostenido por encima de umbral configurable, (b) pérdida de conectividad de un peer, y (c) manipulación no autorizada de archivos de configuración (comparación de checksums SHA-256 contra baseline). Los eventos quedan persistidos y consultables vía `/mesh/anomalies`.
 
-🚧 **Roadmap** — Correlación de anomalías entre múltiples nodos (detectar patrones de ataque coordinado, no solo eventos aislados por nodo).
+✅ **Implementado y probado** — **Correlación de anomalías entre nodos**: si dos o más nodos distintos reportan el mismo tipo de anomalía dentro de una ventana de tiempo corta, el sistema lo marca como `COORDINATED_PATTERN` — señal de ataque coordinado contra la red, distinto de una falla aislada en un solo nodo.
 
-### 1.6 Resiliencia Operativa
+### 1.6 Warrant Canary Criptográfico
+✅ **Implementado y probado** — El nodo firma digitalmente (RSA-2048 / SHA-256) una declaración de integridad cada 60 segundos, incluyendo los checksums actuales de su configuración crítica. La firma se publica en `/mesh/canary` junto con la clave pública del nodo, permitiendo a cualquier tercero verificar de forma independiente —sin confiar en el operador ni en el propio nodo— que el sistema no ha sido comprometido. Verificado end-to-end: firma generada, publicada, y validada criptográficamente de forma externa (`openssl dgst -verify`).
+
+⚠️ **Alcance declarado** — Esta es una señal técnica de integridad continua, no un instrumento legal. No sustituye avisos legales sobre órdenes judiciales; es prueba criptográfica de que el código y configuración vigilados no han cambiado sin autorización.
+
+### 1.7 Resiliencia Operativa
 ✅ **Implementado y probado** — `supervisor.py`: proceso supervisor en Python que monitorea el dashboard y el canal mesh, reiniciándolos automáticamente si mueren. Verificado matando procesos a la fuerza (`kill -9`) y confirmando recuperación automática en menos de 15 segundos.
 
-### 1.7 Integración Continua (CI/CD)
+🔧 **Herramienta disponible, no automatizada** — `rotate_ca.sh`: script de rotación de CA (archiva certificados antiguos, genera nueva autoridad). Invocación manual o programable vía cron; los peers deben re-registrarse tras rotar.
+
+### 1.8 Integración Continua (CI/CD)
 ✅ **Implementado y probado** — Pipeline de GitHub Actions con suite de tests automatizados (login, telemetría autenticada/no autenticada, métricas) y build de imagen Docker condicionado al éxito de los tests. Cache de dependencias pip habilitado.
 
 ---
 **Leyenda:** ✅ Implementado y probado · 🔧 Código existente, pendiente de despliegue/activación · 🚧 Fase 2/3, en diseño
+

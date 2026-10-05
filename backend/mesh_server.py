@@ -8,6 +8,7 @@ import sqlite3
 import threading
 from security.crypto import ensure_tls_certificates
 from security.config_integrity import check_integrity, establish_baseline
+from security.canary import publish_canary, get_latest_canary
 from security.alert_dispatcher import send_alert
 
 logging.basicConfig(
@@ -73,6 +74,17 @@ def config_watcher():
 
 CORRELATION_WINDOW_SECONDS = 120
 CORRELATION_MIN_NODES = 2
+
+CANARY_INTERVAL_SECONDS = 60
+
+def canary_publisher():
+    while True:
+        try:
+            publish_canary(NODE_ID)
+            logger.info("Warrant canary publicado y firmado")
+        except Exception as e:
+            logger.error(f"Error publicando canary: {e}")
+        time.sleep(CANARY_INTERVAL_SECONDS)
 
 def correlation_watcher():
     seen_correlations = set()
@@ -143,6 +155,13 @@ def heartbeat():
     logger.info(f"Heartbeat recibido de peer: {peer_id}")
     return jsonify({"status": "ACK", "node_id": NODE_ID, "peers_known": peer_count}), 200
 
+@app.route("/mesh/canary", methods=["GET"])
+def canary_endpoint():
+    data = get_latest_canary()
+    if not data:
+        return jsonify({"error": "NO_CANARY_PUBLISHED_YET"}), 404
+    return jsonify(data), 200
+
 @app.route("/mesh/peers", methods=["GET"])
 def list_peers():
     now = time.time()
@@ -184,6 +203,8 @@ if __name__ == "__main__":
     config_thread.start()
     correlation_thread = threading.Thread(target=correlation_watcher, daemon=True)
     correlation_thread.start()
+    canary_thread = threading.Thread(target=canary_publisher, daemon=True)
+    canary_thread.start()
 
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)

@@ -7,3 +7,4 @@ __pycache__/
 mesh_peers.db
 backend/mesh_peers.db
 csn-web/
+backend/canary_keys/canary.key
