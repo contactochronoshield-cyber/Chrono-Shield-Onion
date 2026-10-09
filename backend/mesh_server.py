@@ -22,6 +22,7 @@ app = Flask(__name__)
 NODE_ID = os.environ.get("CHRONO_NODE_ID", "chrono-node-unnamed")
 DB_PATH = "mesh_peers.db"
 CPU_ANOMALY_THRESHOLD = 90.0
+MAINTENANCE_UNTIL = {"timestamp": 0}
 OFFLINE_THRESHOLD_SECONDS = 30
 
 def get_db():
@@ -34,9 +35,14 @@ def init_db():
             node_id TEXT PRIMARY KEY,
             last_seen REAL,
             status TEXT,
-            cpu_percent REAL
+            cpu_percent REAL,
+            location TEXT
         )
     """)
+    try:
+        conn.execute("ALTER TABLE peers ADD COLUMN location TEXT")
+    except Exception:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS anomalies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +55,19 @@ def init_db():
     conn.commit()
     conn.close()
 
+def get_node_location(node_id):
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT location FROM peers WHERE node_id = ?", (node_id,)).fetchone()
+        conn.close()
+        return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
 def log_anomaly(node_id, anomaly_type, detail):
+    loc = get_node_location(node_id)
+    if loc:
+        detail = f"[{loc}] {detail}"
     conn = get_db()
     conn.execute(
         "INSERT INTO anomalies (node_id, anomaly_type, detail, detected_at) VALUES (?, ?, ?, ?)",
@@ -65,8 +83,11 @@ def config_watcher():
         try:
             changes = check_integrity()
             if changes:
-                for c in changes:
-                    log_anomaly(NODE_ID, "CONFIG_TAMPERED", f"Archivo modificado sin autorizacion: {c['path']}")
+                if time.time() < MAINTENANCE_UNTIL["timestamp"]:
+                    logger.info(f"Cambio de config detectado DURANTE ventana de mantenimiento autorizada, omitiendo alerta")
+                else:
+                    for c in changes:
+                        log_anomaly(NODE_ID, "CONFIG_TAMPERED", f"Archivo modificado sin autorizacion: {c['path']}")
                 establish_baseline()
         except Exception as e:
             logger.error(f"Error en config_watcher: {e}")
@@ -141,19 +162,41 @@ def heartbeat():
         log_anomaly(peer_id, "CPU_HIGH", f"CPU al {cpu}% (umbral: {CPU_ANOMALY_THRESHOLD}%)")
 
     conn = get_db()
+    location = data.get("location", "desconocida")
     conn.execute("""
-        INSERT INTO peers (node_id, last_seen, status, cpu_percent)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO peers (node_id, last_seen, status, cpu_percent, location)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(node_id) DO UPDATE SET
             last_seen=excluded.last_seen,
             status=excluded.status,
-            cpu_percent=excluded.cpu_percent
-    """, (peer_id, time.time(), data.get("status", "unknown"), cpu))
+            cpu_percent=excluded.cpu_percent,
+            location=excluded.location
+    """, (peer_id, time.time(), data.get("status", "unknown"), cpu, location))
     conn.commit()
     peer_count = conn.execute("SELECT COUNT(*) FROM peers").fetchone()[0]
     conn.close()
     logger.info(f"Heartbeat recibido de peer: {peer_id}")
     return jsonify({"status": "ACK", "node_id": NODE_ID, "peers_known": peer_count}), 200
+
+@app.route("/mesh/maintenance", methods=["POST"])
+def start_maintenance():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "UNAUTHORIZED", "message": "Requiere token JWT de administrador (mismo que el dashboard)."}), 401
+
+    token = auth_header.split(" ")[1]
+    import jwt as jwt_lib
+    jwt_secret = os.environ.get("CHRONO_JWT_SECRET")
+    try:
+        jwt_lib.decode(token, jwt_secret, algorithms=["HS256"])
+    except Exception:
+        return jsonify({"error": "INVALID_TOKEN"}), 401
+
+    data = request.get_json(silent=True) or {}
+    minutes = min(data.get("minutes", 10), 60)
+    MAINTENANCE_UNTIL["timestamp"] = time.time() + (minutes * 60)
+    logger.warning(f"Ventana de mantenimiento activada por {minutes} minutos (autenticado)")
+    return jsonify({"status": "MAINTENANCE_ACTIVE", "until": MAINTENANCE_UNTIL["timestamp"]}), 200
 
 @app.route("/mesh/canary", methods=["GET"])
 def canary_endpoint():
@@ -166,10 +209,10 @@ def canary_endpoint():
 def list_peers():
     now = time.time()
     conn = get_db()
-    rows = conn.execute("SELECT node_id, last_seen, status, cpu_percent FROM peers").fetchall()
+    rows = conn.execute("SELECT node_id, last_seen, status, cpu_percent, location FROM peers").fetchall()
     conn.close()
     active_peers = {
-        r[0]: {"last_seen": r[1], "status": r[2], "cpu_percent": r[3], "online": (now - r[1]) < OFFLINE_THRESHOLD_SECONDS}
+        r[0]: {"last_seen": r[1], "status": r[2], "cpu_percent": r[3], "location": r[4], "online": (now - r[1]) < OFFLINE_THRESHOLD_SECONDS}
         for r in rows
     }
     return jsonify({"node_id": NODE_ID, "peers": active_peers}), 200

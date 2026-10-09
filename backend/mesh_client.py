@@ -12,6 +12,7 @@ def _safe_cpu():
         return -1.0
 
 NODE_ID = os.environ.get("CHRONO_NODE_ID")
+NODE_LOCATION = os.environ.get("CHRONO_NODE_LOCATION", "ubicacion-no-especificada")
 MAIN_NODE_HOST = os.environ.get("CHRONO_MAIN_NODE", "127.0.0.1")
 CERT_DIR = "peer_certs"
 
@@ -44,6 +45,7 @@ while True:
         payload = {
             "node_id": NODE_ID,
             "status": "online",
+            "location": NODE_LOCATION,
             "cpu_percent": _safe_cpu()
         }
         r = requests.post(url, json=payload, cert=cert, verify=ca_crt, timeout=5)
