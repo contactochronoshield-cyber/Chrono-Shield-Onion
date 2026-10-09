@@ -9,3 +9,5 @@ backend/mesh_peers.db
 csn-web/
 backend/canary_keys/canary.key
 backend/security/config_baseline.json
+backend/peer_certs/*.crt
+backend/peer_certs/*.csr
