@@ -188,9 +188,12 @@ def start_maintenance():
     import jwt as jwt_lib
     jwt_secret = os.environ.get("CHRONO_JWT_SECRET")
     try:
-        jwt_lib.decode(token, jwt_secret, algorithms=["HS256"])
+        decoded = jwt_lib.decode(token, jwt_secret, algorithms=["HS256"])
     except Exception:
         return jsonify({"error": "INVALID_TOKEN"}), 401
+
+    if decoded.get("role") != "admin":
+        return jsonify({"error": "FORBIDDEN", "message": "Requiere rol admin para modo mantenimiento."}), 403
 
     data = request.get_json(silent=True) or {}
     minutes = min(data.get("minutes", 10), 60)

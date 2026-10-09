@@ -22,6 +22,8 @@ app = Flask(__name__, static_folder="../frontend", static_url_path="")
 JWT_SECRET = os.environ.get("CHRONO_JWT_SECRET")
 ADMIN_USER = os.environ.get("CHRONO_ADMIN_USER")
 ADMIN_PASS_HASH = os.environ.get("CHRONO_ADMIN_PASS_HASH")
+SUPPORT_USER = os.environ.get("CHRONO_SUPPORT_USER")
+SUPPORT_PASS_HASH = os.environ.get("CHRONO_SUPPORT_PASS_HASH")
 
 for name, val in [("CHRONO_JWT_SECRET", JWT_SECRET), ("CHRONO_ADMIN_USER", ADMIN_USER), ("CHRONO_ADMIN_PASS_HASH", ADMIN_PASS_HASH)]:
     if not val:
@@ -96,15 +98,23 @@ def login():
     username = data.get("username", "")
     password = data.get("password", "")
 
-    if username != ADMIN_USER or not check_password_hash(ADMIN_PASS_HASH, password):
+    role = None
+    if username == ADMIN_USER and check_password_hash(ADMIN_PASS_HASH, password):
+        role = "admin"
+    elif SUPPORT_USER and SUPPORT_PASS_HASH and username == SUPPORT_USER and check_password_hash(SUPPORT_PASS_HASH, password):
+        role = "support"
+
+    if role is None:
         logger.warning(f"Intento de login fallido desde IP: {client_ip} (usuario: {username})")
         return jsonify({"error": "INVALID_CREDENTIALS", "message": "Usuario o contraseña incorrectos."}), 401
 
+    permissions = ["telemetry:read", "node:control"] if role == "admin" else ["telemetry:read"]
     payload = {
         "sub": username,
+        "role": role,
         "iat": time.time(),
         "exp": time.time() + 3600,
-        "permissions": ["telemetry:read", "node:control"]
+        "permissions": permissions
     }
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
     logger.info(f"Login exitoso para usuario: {username} desde IP: {client_ip}")
