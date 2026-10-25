@@ -4,12 +4,17 @@ cd ~/Chrono-Shield-Onion
 
 echo "=== 1. Verificando .env.local ==="
 if [ ! -f .env.local ]; then
+  JWT_SECRET=$(python -c "import secrets; print(secrets.token_hex(32))")
+  ADMIN_PASS=$(python -c "import secrets; print(secrets.token_urlsafe(12))")
+  ADMIN_HASH=$(ADMIN_PASS="$ADMIN_PASS" python -c "import os; from werkzeug.security import generate_password_hash as g; print(g(os.environ['ADMIN_PASS'], method='scrypt'))")
   {
-    echo "export CHRONO_JWT_SECRET=\"f2fc6d088624fc2221381520960d92c3bd3c3e4111bfe256fc2053c5498bbec3\""
+    echo "export CHRONO_JWT_SECRET=\"$JWT_SECRET\""
     echo "export CHRONO_ADMIN_USER=\"admin\""
-    echo "export CHRONO_ADMIN_PASS_HASH='scrypt:32768:8:1\$JuFyYwo5Cxjr6iIy\$e90b011778cc63898416d74b725e18e516b18c919e749d65026feda3a9be1884ef2a9a87c6ada6734e3c8a1bb72e4f4cad8fea81583363b88901f5ecd7692bfc'"
-    echo "export CHRONO_NODE_ID=\"chrono-node-01-bogota\""
+    echo "export CHRONO_ADMIN_PASS_HASH='$ADMIN_HASH'"
+    echo "export CHRONO_NODE_ID=\"${CHRONO_NODE_ID:-chrono-node-01-bogota}\""
   } > .env.local
+  chmod 600 .env.local
+  echo "Contrasena de admin generada (se muestra UNA sola vez): $ADMIN_PASS"
 fi
 source .env.local
 
