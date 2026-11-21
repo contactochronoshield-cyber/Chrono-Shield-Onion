@@ -79,10 +79,16 @@ def check_integrity():
     changes = []
 
     for path, old_hash in baseline.items():
-        new_hash = _hash_file(path)
+        candidate = Path(path)
+
+        # Compatibilidad con rutas relativas de la línea base antigua.
+        if not candidate.is_absolute():
+            candidate = (ROOT / "backend" / candidate).resolve()
+
+        new_hash = _hash_file(candidate)
         if new_hash != old_hash:
             changes.append({
-                "path": path,
+                "path": str(candidate),
                 "expected": old_hash,
                 "found": new_hash,
             })
