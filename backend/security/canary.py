@@ -20,10 +20,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Conservar las claves existentes si no se ha configurado
 # previamente un directorio de datos externo.
 LEGACY_KEY_DIR = ROOT / "backend" / "canary_keys"
-CANARY_KEY_DIR = (
-    DATA_DIR / "canary_keys"
-    if _DATA else LEGACY_KEY_DIR
-)
+CANARY_KEY_DIR = LEGACY_KEY_DIR
 CANARY_KEY = CANARY_KEY_DIR / "canary.key"
 CANARY_PUB = CANARY_KEY_DIR / "canary_pub.pem"
 
