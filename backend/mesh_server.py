@@ -155,7 +155,14 @@ def offline_watcher():
 @app.route("/mesh/heartbeat", methods=["POST"])
 def heartbeat():
     data = request.get_json(silent=True) or {}
-    peer_id = data.get("node_id", "unknown")
+    try:
+        from backend.security.identity import resolve_peer_identity
+    except ImportError:
+        from security.identity import resolve_peer_identity
+    peer_id, id_error = resolve_peer_identity(request.environ.get("peercert"), data.get("node_id"))
+    if id_error:
+        logger.warning(f"Heartbeat rechazado ({id_error}): dice ser {data.get('node_id')!r}")
+        return jsonify({"error": "IDENTITY_MISMATCH"}), 403
     cpu = data.get("cpu_percent")
 
     if cpu is not None and cpu >= CPU_ANOMALY_THRESHOLD:
