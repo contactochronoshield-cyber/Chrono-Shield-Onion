@@ -61,32 +61,31 @@ def health_check():
 
 @app.route("/metrics", methods=["GET"])
 def prometheus_metrics():
-    try:
-        cpu_pct = psutil.cpu_percent(interval=None)
-        mem = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        net_conns = len(psutil.net_connections(kind='inet'))
+    def safe(fn):
+        try:
+            return fn()
+        except Exception as e:
+            logger.warning(f"Métrica no disponible en este host: {e}")
+            return None
 
-        metrics_output = f"""# HELP chrono_cpu_percent Real-time CPU utilization percentage
-# TYPE chrono_cpu_percent gauge
-chrono_cpu_percent {cpu_pct}
-
-# HELP chrono_memory_percent Real-time System RAM usage percentage
-# TYPE chrono_memory_percent gauge
-chrono_memory_percent {mem.percent}
-
-# HELP chrono_disk_percent Root filesystem usage percentage
-# TYPE chrono_disk_percent gauge
-chrono_disk_percent {disk.percent}
-
-# HELP chrono_active_connections Total active inet network sockets
-# TYPE chrono_active_connections gauge
-chrono_active_connections {net_conns}
-"""
-        return metrics_output, 200, {'Content-Type': 'text/plain; charset=utf-8'}
-    except Exception as e:
-        logger.error(f"Fallo recolectando métricas del kernel: {str(e)}")
-        return jsonify({"error": "METRICS_COLLECTION_FAILED", "details": str(e)}), 500
+    mem = safe(psutil.virtual_memory)
+    disk = safe(lambda: psutil.disk_usage('/'))
+    metrics = [
+        ("chrono_cpu_percent", "Real-time CPU utilization percentage",
+         safe(lambda: psutil.cpu_percent(interval=None))),
+        ("chrono_memory_percent", "Real-time System RAM usage percentage",
+         mem.percent if mem else None),
+        ("chrono_disk_percent", "Root filesystem usage percentage",
+         disk.percent if disk else None),
+        ("chrono_active_connections", "Total active inet network sockets",
+         safe(lambda: len(psutil.net_connections(kind='inet')))),
+    ]
+    out = ""
+    for name, help_text, value in metrics:
+        if value is None:
+            continue
+        out += f"# HELP {name} {help_text}\n# TYPE {name} gauge\n{name} {value}\n\n"
+    return out, 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 @app.route("/api/v1/auth/login", methods=["POST"])
 def login():
