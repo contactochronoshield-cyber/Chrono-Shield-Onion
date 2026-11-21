@@ -12,3 +12,5 @@ backend/security/config_baseline.json
 backend/peer_certs/*.crt
 backend/peer_certs/*.csr
 data/
+certs.old.*
+peer_certs/
