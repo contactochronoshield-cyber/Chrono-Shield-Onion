@@ -1,19 +1,31 @@
-version: '3.8'
-
 services:
   chrono-core:
     build: .
     container_name: chrono-shield-core
     restart: unless-stopped
+    command: ["python", "supervisor.py"]
     ports:
-      - "5000:5000"
+      - "5000:5000"   # dashboard admin (JWT)
+      - "5443:5443"   # mesh mTLS
+      - "5444:5444"   # enrolamiento / canary público
     environment:
-      - CHRONO_API_KEY=production-secure-key-2026
+      - CHRONO_JWT_SECRET=${CHRONO_JWT_SECRET:?falta CHRONO_JWT_SECRET (source .env.local)}
+      - CHRONO_ADMIN_USER=${CHRONO_ADMIN_USER:-admin}
+      - CHRONO_ADMIN_PASS_HASH=${CHRONO_ADMIN_PASS_HASH:?falta CHRONO_ADMIN_PASS_HASH}
+      - CHRONO_NODE_ID=${CHRONO_NODE_ID:-chrono-node-01}
+      - CHRONO_SAN=${CHRONO_SAN:-}
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - chrono-certs:/app/certs
+      - chrono-data:/app/data
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
+
+volumes:
+  chrono-certs:
+  chrono-data:

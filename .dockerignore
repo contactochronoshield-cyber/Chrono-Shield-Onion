@@ -1,0 +1,11 @@
+.git
+.env*
+certs/
+certs.old.*
+peer_certs/
+data/
+*.db
+__pycache__/
+.pytest_cache/
+tests/
+node_modules/
