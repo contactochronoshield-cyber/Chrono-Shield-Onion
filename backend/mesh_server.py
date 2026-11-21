@@ -251,6 +251,13 @@ if __name__ == "__main__":
     correlation_thread.start()
     canary_thread = threading.Thread(target=canary_publisher, daemon=True)
     canary_thread.start()
+    try:
+        from backend.enroll_server import run_enroll_server
+    except ImportError:
+        from enroll_server import run_enroll_server
+    threading.Thread(target=run_enroll_server,
+                     kwargs={"canary_getter": get_latest_canary},
+                     daemon=True).start()
 
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)

@@ -71,3 +71,17 @@ def sha256_file(path):
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def verify_code_integrity(file_paths):
+    report = {}
+    for path in file_paths:
+        if os.path.exists(path):
+            h = hashlib.sha256()
+            with open(path, "rb") as f:
+                for block in iter(lambda: f.read(4096), b""):
+                    h.update(block)
+            report[path] = h.hexdigest()
+        else:
+            report[path] = "FILE_NOT_FOUND"
+    return report
