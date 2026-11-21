@@ -21,3 +21,16 @@ def resolve_peer_identity(peercert, claimed):
     if os.environ.get("CHRONO_ALLOW_LEGACY_IDENTITY") == "1":
         return claimed or "unknown", None
     return None, "no_identity"
+
+
+def get_peercert(environ):
+    """Certificado del cliente desde el socket TLS de Werkzeug (formato dict con SAN)."""
+    sock = environ.get("werkzeug.socket")
+    if sock is not None:
+        try:
+            cert = sock.getpeercert()
+            if cert:
+                return cert
+        except Exception:
+            pass
+    return environ.get("peercert")

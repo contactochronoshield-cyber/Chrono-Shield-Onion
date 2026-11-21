@@ -27,3 +27,14 @@ def test_modo_legacy(monkeypatch):
 
 def test_localhost_no_cuenta():
     assert r({"subjectAltName": (("DNS", "localhost"),)}, "x") == (None, "no_identity")
+
+
+def test_get_peercert_desde_socket():
+    from backend.security.identity import get_peercert
+
+    class S:
+        def getpeercert(self):
+            return {"subjectAltName": (("DNS", "x"),)}
+
+    assert get_peercert({"werkzeug.socket": S()})["subjectAltName"][0][1] == "x"
+    assert get_peercert({}) is None

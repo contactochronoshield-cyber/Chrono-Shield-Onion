@@ -160,10 +160,10 @@ def offline_watcher():
 def heartbeat():
     data = request.get_json(silent=True) or {}
     try:
-        from backend.security.identity import resolve_peer_identity
+        from backend.security.identity import resolve_peer_identity, get_peercert
     except ImportError:
-        from security.identity import resolve_peer_identity
-    peer_id, id_error = resolve_peer_identity(request.environ.get("peercert"), data.get("node_id"))
+        from security.identity import resolve_peer_identity, get_peercert
+    peer_id, id_error = resolve_peer_identity(get_peercert(request.environ), data.get("node_id"))
     if id_error:
         logger.warning(f"Heartbeat rechazado ({id_error}): dice ser {data.get('node_id')!r}")
         return jsonify({"error": "IDENTITY_MISMATCH"}), 403
