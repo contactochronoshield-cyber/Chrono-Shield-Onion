@@ -92,7 +92,7 @@ def config_watcher():
                 else:
                     for c in changes:
                         log_anomaly(NODE_ID, "CONFIG_TAMPERED", f"Archivo modificado sin autorizacion: {c['path']}")
-                establish_baseline()
+                # La línea base nunca se actualiza automáticamente.
         except Exception as e:
             logger.error(f"Error en config_watcher: {e}")
         time.sleep(30)

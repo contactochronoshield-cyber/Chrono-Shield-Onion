@@ -1,41 +1,90 @@
-import hashlib
 import os
 import json
+import hashlib
+from pathlib import Path
 
-import os as _os
-_DATA = _os.environ.get("CHRONO_DATA_DIR")
-if _DATA:
-    _os.makedirs(_DATA, exist_ok=True)
-BASELINE_PATH = _os.path.join(_DATA, "config_baseline.json") if _DATA else "security/config_baseline.json"
+ROOT = Path(__file__).resolve().parents[2]
+_DATA = os.environ.get("CHRONO_DATA_DIR")
+
+DATA_DIR = Path(_DATA).expanduser().resolve() if _DATA else (
+    ROOT / "backend" / "security"
+)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+BASELINE_PATH = DATA_DIR / "config_baseline.json"
+
 WATCHED_PATHS = [
-    "../router-config/chronoshield.conf",
-    "../router-config/nginx-mtls.conf",
+    ROOT / "router-config" / "chronoshield.conf",
+    ROOT / "router-config" / "nginx-mtls.conf",
 ]
 
+
 def _hash_file(path):
-    if not os.path.exists(path):
+    path = Path(path)
+    if not path.is_file():
         return None
+
     h = hashlib.sha256()
-    with open(path, "rb") as f:
+    with path.open("rb") as f:
         for block in iter(lambda: f.read(4096), b""):
             h.update(block)
     return h.hexdigest()
 
+
 def establish_baseline():
-    baseline = {p: _hash_file(p) for p in WATCHED_PATHS}
-    with open(BASELINE_PATH, "w") as f:
+    """
+    Actualización administrativa explícita.
+    No debe llamarse automáticamente al detectar cambios.
+    """
+    baseline = {
+        str(path): _hash_file(path)
+        for path in WATCHED_PATHS
+    }
+
+    temp_path = BASELINE_PATH.with_suffix(".tmp")
+
+    with temp_path.open("w", encoding="utf-8") as f:
         json.dump(baseline, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.replace(temp_path, BASELINE_PATH)
+    os.chmod(BASELINE_PATH, 0o600)
+
     return baseline
 
+
 def check_integrity():
-    if not os.path.exists(BASELINE_PATH):
-        establish_baseline()
-        return []
-    with open(BASELINE_PATH) as f:
-        baseline = json.load(f)
+    """
+    Solo detecta. Nunca crea ni actualiza automáticamente
+    una línea base ausente o modificada.
+    """
+    if not BASELINE_PATH.exists():
+        return [{
+            "path": str(BASELINE_PATH),
+            "expected": "BASELINE_EXISTS",
+            "found": "MISSING",
+        }]
+
+    try:
+        with BASELINE_PATH.open(encoding="utf-8") as f:
+            baseline = json.load(f)
+    except (OSError, ValueError):
+        return [{
+            "path": str(BASELINE_PATH),
+            "expected": "VALID_BASELINE",
+            "found": "UNREADABLE_OR_INVALID",
+        }]
+
     changes = []
+
     for path, old_hash in baseline.items():
         new_hash = _hash_file(path)
         if new_hash != old_hash:
-            changes.append({"path": path, "expected": old_hash, "found": new_hash})
+            changes.append({
+                "path": path,
+                "expected": old_hash,
+                "found": new_hash,
+            })
+
     return changes
