@@ -9,7 +9,11 @@ from security.config_integrity import check_integrity, WATCHED_PATHS, _hash_file
 CANARY_KEY_DIR = "canary_keys"
 CANARY_KEY = f"{CANARY_KEY_DIR}/canary.key"
 CANARY_PUB = f"{CANARY_KEY_DIR}/canary_pub.pem"
-DB_PATH = "mesh_peers.db"
+import os as _os
+_DATA = _os.environ.get("CHRONO_DATA_DIR")
+if _DATA:
+    _os.makedirs(_DATA, exist_ok=True)
+DB_PATH = _os.path.join(_DATA, "mesh_peers.db") if _DATA else "mesh_peers.db"
 
 def ensure_canary_keypair():
     os.makedirs(CANARY_KEY_DIR, exist_ok=True)

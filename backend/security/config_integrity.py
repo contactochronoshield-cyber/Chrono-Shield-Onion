@@ -2,7 +2,11 @@ import hashlib
 import os
 import json
 
-BASELINE_PATH = "security/config_baseline.json"
+import os as _os
+_DATA = _os.environ.get("CHRONO_DATA_DIR")
+if _DATA:
+    _os.makedirs(_DATA, exist_ok=True)
+BASELINE_PATH = _os.path.join(_DATA, "config_baseline.json") if _DATA else "security/config_baseline.json"
 WATCHED_PATHS = [
     "../router-config/chronoshield.conf",
     "../router-config/nginx-mtls.conf",

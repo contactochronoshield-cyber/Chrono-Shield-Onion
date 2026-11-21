@@ -20,7 +20,11 @@ logger = logging.getLogger("ChronoMeshChannel")
 
 app = Flask(__name__)
 NODE_ID = os.environ.get("CHRONO_NODE_ID", "chrono-node-unnamed")
-DB_PATH = "mesh_peers.db"
+import os as _os
+_DATA = _os.environ.get("CHRONO_DATA_DIR")
+if _DATA:
+    _os.makedirs(_DATA, exist_ok=True)
+DB_PATH = _os.path.join(_DATA, "mesh_peers.db") if _DATA else "mesh_peers.db"
 CPU_ANOMALY_THRESHOLD = 90.0
 MAINTENANCE_UNTIL = {"timestamp": 0}
 OFFLINE_THRESHOLD_SECONDS = 30
