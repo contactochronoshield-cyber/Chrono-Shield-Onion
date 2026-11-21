@@ -22,6 +22,7 @@ services:
     volumes:
       - chrono-certs:/app/backend/certs
       - chrono-data:/app/backend/data
+      - chrono-keys:/app/backend/canary_keys
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 10s
@@ -31,3 +32,4 @@ services:
 volumes:
   chrono-certs:
   chrono-data:
+  chrono-keys:

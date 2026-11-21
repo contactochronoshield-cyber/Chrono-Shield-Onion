@@ -9,3 +9,5 @@ __pycache__/
 .pytest_cache/
 tests/
 node_modules/
+canary_keys/
+backend/canary_keys/

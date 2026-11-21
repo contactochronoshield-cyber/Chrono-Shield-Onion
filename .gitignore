@@ -14,3 +14,5 @@ backend/peer_certs/*.csr
 data/
 certs.old.*
 peer_certs/
+canary_keys/
+backend/canary_keys/
