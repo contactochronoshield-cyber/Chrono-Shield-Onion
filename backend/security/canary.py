@@ -89,6 +89,7 @@ def get_latest_canary():
             pubkey = f.read()
     return {
         "published_at": row[0],
+        "statement_raw": row[1],
         "statement": json.loads(row[1]),
         "signature_b64": row[2],
         "public_key_pem": pubkey

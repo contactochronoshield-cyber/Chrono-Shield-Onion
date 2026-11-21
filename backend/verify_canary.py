@@ -19,7 +19,10 @@ def pubkey_fingerprint(public_key_pem):
 
 def verify_data(data, pin=None):
     """Devuelve (firma_valida, pin_coincide|None, huella_clave_publica)."""
-    statement_json = json.dumps(data["statement"], sort_keys=True)
+    raw = data.get("statement_raw")
+    if raw is not None and json.loads(raw) != data["statement"]:
+        return False, None, "statement inconsistente con statement_raw"
+    statement_json = raw if raw is not None else json.dumps(data["statement"], sort_keys=True)
     sig = base64.b64decode(data["signature_b64"])
     with tempfile.TemporaryDirectory() as d:
         paths = {n: os.path.join(d, n) for n in ("stmt.json", "stmt.sig", "pub.pem")}
