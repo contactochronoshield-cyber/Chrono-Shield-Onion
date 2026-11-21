@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
-RUN mkdir -p /app/certs /app/data && chown -R chronouser:chronouser /app
+RUN mkdir -p /app/backend/certs /app/backend/data && chown -R chronouser:chronouser /app
 
 USER chronouser
 

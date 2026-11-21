@@ -1,8 +1,9 @@
 #!/bin/bash
 # Uso: ./add_node.sh [segundos_de_vigencia] [etiqueta]
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT/backend"
 FP=$(openssl x509 -in certs/ca.crt -noout -fingerprint -sha256 | cut -d= -f2)
-TOKEN=$(python -m backend.security.enroll new-token --ttl "${1:-600}" --label "${2:-}")
+TOKEN=$(PYTHONPATH="$ROOT" python -m backend.security.enroll new-token --ttl "${1:-600}" --label "${2:-}")
 echo "Token de un solo uso (vence en ${1:-600}s). En el nodo nuevo ejecuta:"
 echo
 echo "export CHRONO_MAIN_NODE=<IP_o_dominio_de_este_nodo>"

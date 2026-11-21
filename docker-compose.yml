@@ -14,12 +14,13 @@ services:
       - CHRONO_ADMIN_PASS_HASH=${CHRONO_ADMIN_PASS_HASH:?falta CHRONO_ADMIN_PASS_HASH}
       - CHRONO_NODE_ID=${CHRONO_NODE_ID:-chrono-node-01}
       - CHRONO_SAN=${CHRONO_SAN:-}
+      - CHRONO_LOG_TO_STDOUT=1
     read_only: true
     tmpfs:
       - /tmp
     volumes:
-      - chrono-certs:/app/certs
-      - chrono-data:/app/data
+      - chrono-certs:/app/backend/certs
+      - chrono-data:/app/backend/data
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 10s
