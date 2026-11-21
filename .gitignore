@@ -16,3 +16,5 @@ certs.old.*
 peer_certs/
 canary_keys/
 backend/canary_keys/
+.env*
+backend/peer_certs/
